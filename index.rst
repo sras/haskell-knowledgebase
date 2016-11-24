@@ -7,7 +7,7 @@ Connecting to the Postgresql database
 Opaleye uses a lower level postgresql database client library called postgresql-simple to actually talk to the database.
 So we will start by getting a value of type *Connection*, which represents a connection to a postgresql database server
 and is defined by the postgresql-simple library. We obtain a 'Connection' by using the 'connect'
-function, also provided by the postgresql-simple library.
+function, also provided by the postgresql-simple library. ::
 
     connect :: ConnectInfo -> IO Connection
 
@@ -27,7 +27,7 @@ Actually you can start querying the database right now using functions provided 
 But that would be really low level and we are using opaleye to communicate with the database at a higher level.
 
 Your very first query.
----------------------
+----------------------
 
 You need some 'setting up' to tell opaleye about properties of your table rows. By that way, you get a bit
 of safety from type system. For example, the type system can prevent you from running code that will

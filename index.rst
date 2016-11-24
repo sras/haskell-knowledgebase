@@ -35,7 +35,9 @@ create "column cannot be null" error from the database. You won't get these kind
 are using raw postgresql-simple functions.
 
 Let us get started defining a *Table* value for a table named "users", which has the
-following structure, ::
+following structure,
+
+  .. code-block:: sql
 
     create table users(
        id serial primary key

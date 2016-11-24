@@ -24,7 +24,7 @@ This means that you can get a connection as follows ::
 
 Now that we have a live connection to the database, we can start setting up stuff to ineract with it.
 Actually you can start querying the database right now using functions provided by postgresql-simple.
-But that would be really low level and we are using opaleye to communicate with the database at a higher level.
+But that would be really low level and we want to use opaleye to communicate with the database at a higher level.
 
 Your very first query.
 ----------------------
@@ -50,7 +50,7 @@ Here is the a haskell function (getUserRows), that returns all the rows in this 
   .. literalinclude:: code/opaleye-select-basic.hs
 
 
-Warning! The above code will not compile and error out with an "ambiguous type variable" error, if you remove the type annotations of the userTable and getUserRows functions.
+  Warning! The above code will not compile and error out with an "ambiguous type variable" error, if you remove the type annotations of the userTable and getUserRows functions.
 
 Let us first look at the type of the 'userTable'. ::
 
@@ -92,7 +92,7 @@ into a value of type ::
 
     TableProperties (a0, a1, a2) (b0, b1, b2)*
 
-Giving us a value of the required type  ::
+and applying it to the earlier tuple give us a value of the required type  ::
 
     Table 
       (Column PGInt4, Column PGText, Column PGText) 

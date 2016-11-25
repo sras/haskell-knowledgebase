@@ -8,10 +8,10 @@ import Database.PostgreSQL.Simple
 userTable :: Table 
     (Column PGInt4, Column PGText, Column PGText) 
     (Column PGInt4, Column PGText, Column PGText)
-userTable = Table "scratch" (p3 (
+userTable = Table "users" (p3 (
     required "id",
-    required "email",
-    required "name"
+    required "name",
+    required "email"
     ))
 
 getUserRows :: IO [(Int, String, String)]

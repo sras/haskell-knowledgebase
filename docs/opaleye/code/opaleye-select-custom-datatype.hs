@@ -2,7 +2,7 @@
 module Main where
 
 import Opaleye
-import Data.Profunctor.Product (p4, p3)
+import Data.Profunctor.Product (p3)
 
 import Database.PostgreSQL.Simple
 import Database.PostgreSQL.Simple.FromField
@@ -10,10 +10,10 @@ import Database.PostgreSQL.Simple.FromField
 userTable :: Table 
     (Column PGInt4, Column PGText, Column PGText) 
     (Column PGInt4, Column PGText, Column PGText)
-userTable = Table "scratch" (p3 (
+userTable = Table "users" (p3 (
     required "id",
-    required "email",
-    required "name"
+    required "name",
+    required "email"
     ))
 
 newtype UserId = UserId Int deriving (Show)

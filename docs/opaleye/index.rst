@@ -1,8 +1,7 @@
-Haskell Knowledgebase
+Opaleye knowledge base
 ==============================
 
   .. toctree::
      :maxdepth: 2
 
-     docs/opaleye/index
-
+     reading

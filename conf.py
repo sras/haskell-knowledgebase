@@ -49,9 +49,9 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = u'Haskell-Docs'
+project = u'Haskell-Knowledgebase'
 copyright = u'2016, Sandeep'
-author = u'Sandeep'
+author = u'Sandeep C R <sandeepcr2@gmail.com>'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the

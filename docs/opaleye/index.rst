@@ -1,4 +1,4 @@
-Opaleye knowledge base
+Opaleye 
 ==============================
 
   .. toctree::

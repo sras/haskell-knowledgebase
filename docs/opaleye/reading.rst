@@ -42,16 +42,20 @@ following structure,
 
     create table users(
        id serial primary key
-      ,email text not null
       ,name text not null
+      ,email text not null
     );
+
+    insert into "users" values (1, 'John', 'john@mail.com');
+    insert into "users" values (2, 'Bob', 'bob@mail.com');
+    insert into "users" values (3, 'Alice', 'alice@mail.com');
+
 
 Here is the a haskell function (getUserRows), that returns all the rows in this table, using Opaleye's api.
 
 .. literalinclude:: code/opaleye-select-basic.hs
+   :linenos:
 
-
-  Warning! The above code will not compile and error out with an "ambiguous type variable" error, if you remove the type annotations of the userTable and getUserRows functions.
 
 Type works
 ----------
@@ -62,12 +66,32 @@ Let us first look at the type of the 'userTable'. ::
         (Column PGInt4, Column PGText, Column PGText) 
         (Column PGInt4, Column PGText, Column PGText)
 
-The Table is a type constructor that take two concrete types. The first type is the type of the value that opaleye will use to *write* to
+The *Table* is a type that opaleye uses to represent a database Table.
+
+The *Table* type constructor takes two concrete types to create the *Table*. The first type is the type of the value that opaleye will use to *write* to
 the table. Second type is the type of value that opaleye will *read* from table.
+
 
 In this case the both the write type and the read type are the same *viz* (Column PGInt4, Column PGText, Column PGText).
 If we have an autogenerateable field in our table, we might want to make that field a *Maybe* type, so that opaleye can
 use a *Nothing* value while writing to the table. In that case, the read type and write type will not be same.
+
+Let us see how we construct a *Table* value. The *table* type has got two constructors as shown below, ::
+
+    data Table writerColumns viewColumns
+      = Table String (TableProperties writerColumns viewColumns)
+      | TableWithSchema String
+                        String
+                        (TableProperties writerColumns viewColumns)
+
+We will use the first one here. ::
+
+  Table String (TableProperties writerColumns viewColumns)
+
+The first argument to the constructor is a *String*, which has to be the name of the table.
+The second argument is of type *TableProperties writercolumns viewcolumns* where *writercolumns* and
+*viewcolumns* correspond to the write type and read type respectively. Let us see how we are 
+making this second argument.
 
 You might have noticied that we are using a strange function called *p3*. You can also see we are calling a *required* function
 passing in the column names of our table. The type of *required* function is  ::
@@ -77,6 +101,7 @@ passing in the column names of our table. The type of *required* function is  ::
 So this code ::
 
     (
+
     required "id",
     required "email",
     required "name"
@@ -96,11 +121,16 @@ into a value of type ::
 
     TableProperties (a0, a1, a2) (b0, b1, b2)*
 
+(because p3 works with any instance of a *ProductProfunctor* which TableProperties happen to be)
+
 and applying it to the earlier tuple give us a value of the required type  ::
 
-    Table 
+    TableProperties
       (Column PGInt4, Column PGText, Column PGText) 
       (Column PGInt4, Column PGText, Column PGText)
+
+This is passed as the second argument to the *Table* constructor to obtain the required
+*Table* value.
 
 The function *p3* only works with tuples of 3 items. If your table has 4 columns, then
 you have to use *p4* and so on. The Profunctor.Product module defines these functions 
@@ -129,6 +159,7 @@ in the read type tuple.
 
 .. literalinclude:: code/opaleye-select-custom-datatype.hs
    :emphasize-lines: 21-25
+   :linenos:
 
 The important piece of code here is, ::
 
@@ -149,7 +180,9 @@ UserId. Let us see what it expects, ::
       queryRunnerColumnDefault :: QueryRunnerColumn pgType haskellType
 
 Ok. This means that we just needs to define a function that returns a value of type *QueryRunnerColumn PGInt4 UserId*.
-if you look at the hackage page for this typeclass here_, you can see that it mentions a function ::
+if you look at the hackage page for this typeclass 
+`here <https://hackage.haskell.org/package/opaleye-0.5.2.1/docs/Opaleye-Internal-RunQuery.html#t:QueryRunnerColumnDefault>`_, 
+you can see that it mentions a function ::
 
     fieldQueryRunnerColumn :: FromField haskell => QueryRunnerColumn pgType haskell
 
@@ -238,6 +271,178 @@ That is just what we are doing in the code below.
 
 .. literalinclude:: code/opaleye-select-custom-datatype-row.hs
    :emphasize-lines: 26-35
-  
-  
-.. _here: https://hackage.haskell.org/package/opaleye-0.5.2.1/docs/Opaleye-Internal-RunQuery.html#t:QueryRunnerColumnDefault
+   :linenos:
+
+
+Restricting rows
+----------------
+
+We did a *select * from users*. Now let us see how we can do a *select * from user where name = 'John'*.
+
+.. literalinclude:: code/opaleye-select-with-condition.hs
+   :emphasize-lines: 47-49
+   :linenos:
+
+The highlighted lines shows the code that restrict the rows returned by a query. The strange notation
+that code uses is called a *proc* notation and it uses something called *arrows*. If you look at the top,
+you can see that we have also enabled the *Arrows* extension (Without which this code will not pass syntax check). ::
+
+      user@(_, pgName, _) <- queryTable userTable -< ()
+
+This line can be thought of as reading a row into a variable. As you can see, the type of the row is the
+read type of our table. So it is a three element tuple. We want to select rows with "John" in the name column,
+so we just store the name column in a variable, and in the line below ::
+
+      restrict -< (pgName .== (pgStrictText "John"))
+
+We are doing the filtering. *restrict* is a function that you can feed restriction parameters. The *.==* is
+a function exported by Opaleye, which is supposed to look like the *==* comparison operator. It also export similar
+function for the rest of the operators. You can see more of these 
+`here <https://hackage.haskell.org/package/opaleye-0.5.2.1/docs/Opaleye-Operators.html>`_
+This syntax means that you can mix and match these just like you would do
+in an normal sql select query and use parenthesis to group them.
+
+
+Parametric records for rows
+---------------------------
+
+Even though the previous method of reading entire rows into a record works, it
+makes certain things a little difficult. For example, while adding a where clause, we had to do this, ::
+
+      user@(_, pgName, _) <- queryTable userTable -< ()
+
+What if the column has got ten fields? You would have to match on a ten element tuple. That is awkward.
+If you have generated lenses for accessing the fields of User record, you cannot use it here
+because the read row is not a record at this point. This is because the read type of our table 
+is a tuple, and our actual target data structure is a record.
+
+What if we can make the read type of the table, a record? A record of a similar "shape" as that of our
+target data structure?
+
+That is what we are going to do in this section. Here comes the code.
+
+.. literalinclude:: code/opaleye-select-basic-with-records.hs
+   :emphasize-lines: 4, 11, 20-34
+   :linenos:
+
+You can see that we have changed the *User* to be parametrized and defined three type
+synonyms to represent our actual *User* and the read/write types. ::
+
+  data UserPoly id name email = User { id :: id, name :: name, email :: email } deriving (Show)
+
+  type User = UserPoly UserId String String
+  type UserPGW = UserPoly (Column PGInt4) (Column PGText) (Column PGText)
+  type UserPGR = UserPoly (Column PGInt4) (Column PGText) (Column PGText)
+
+Just after that, we are calling a Template Haskell function, ::
+
+  $(makeAdaptorAndInstance "pUser" ''UserPoly)
+
+Which expands into the following code ::
+
+    pUser ::
+      forall p a1_0 a2_0 a3_0 a1_1 a2_1 a3_1.
+      ProductProfunctor p =>
+      UserPoly (p a1_0 a1_1) (p a2_0 a2_1) (p a3_0 a3_1)
+      -> p (UserPoly a1_0 a2_0 a3_0) (UserPoly a1_1 a2_1 a3_1)
+    pUser
+      = (((profunctors-5.2:Data.Profunctor.Unsafe.dimap
+             toTuple fromTuple)
+          . p3)
+         . toTuple)
+      where
+          toTuple (User a1_ a2_ a3_) = (a1_, a2_, a3_)
+          fromTuple (a1_, a2_, a3_) = User a1_ a2_ a3_
+
+    instance (ProductProfunctor p,
+              Default p a1_0 a1_1,
+              Default p a2_0 a2_1,
+              Default p a3_0 a3_1) =>
+             Default p (UserPoly a1_0 a2_0 a3_0) (UserPoly a1_1 a2_1 a3_1) where
+      def = pUser (User def def def)
+
+As you can see, this code contain two items, one is a function *pUser* and other is an instance
+declaration.
+
+If you remember our last section where we were reading whole rows to a record, you will recall
+we had to use a function *p3* and had to define an instance of *Default*. That
+is exactly what this code do. The *pUser* function is the counterpart of *p3*
+that can be used with our polymorphic *UserPoly* records. The instance declaration
+enables rows to be read into any type that is generated from *UserPoly* type constructor, as long
+as the constituent types conforms with the constraints in the instance declaration. 
+See the use of *def* function in this line. ::
+
+      def = pUser (User def def def)
+
+Also, last time we used the concrete type *QueryRunner* in place of type variable *p* here. But here
+*p* can take any instance of *ProductProfunctor*, which *QueryRunner* happen to be an instance of.
+So everything lines up nicely and we can start writing our queries, as we do in the code below.
+
+.. literalinclude:: code/opaleye-select-with-records-and-restrict.hs
+   :emphasize-lines: 49-50
+   :linenos:
+
+In the emphasized lines, you can see we pattern match on the *User* record. But
+this time, since we are getting records, we were able to pattern match on the field name. This
+is much nicer than pattern matching on an arbitrarily large tuple, as we did last time.
+This can be much more nicer if we have generated lenses for the records.
+
+
+Excercise 1: Read an enum type into a sum type record field
+
+Suppose our *User* record has a field called that represent the type of the user.
+In Haskell we can model this as a sum type. ::
+
+  data UserType = SuperAdmin | Admin | Registered
+
+We will use the following sql to create the custom type and the table
+
+.. code-block:: sql
+  :linenos:
+
+    create type user_type as enum('superadmin', 'admin', 'registered');
+
+    create table typed_users(
+           id serial primary key
+           ,name text not null
+           ,email text not null
+           ,user_type user_type not null
+    );
+
+    insert into "typed_users" values (1, 'John', 'john@mail.com', 'superadmin');
+    insert into "typed_users" values (2, 'Bob', 'bob@mail.com', 'registered');
+    insert into "typed_users" values (3, 'Alice', 'alice@mail.com', 'admin');
+
+You might be tempted to write FromField instances for this type as follows,
+taking advantage of the FromField instance of a *String*
+
+.. code-block:: haskell
+  :linenos:
+
+    instance FromField UserType where
+      fromField field bs = utConversion $ fromField field bs
+        where
+          utConversion :: Conversion String -> Conversion UserType
+          utConversion cString = do
+            typeString <- cString
+            case mkUserType typeString of
+              Nothing -> returnError ConversionFailed field "Unrecognized user type"
+              Just ut -> return ut
+          mkUserType :: String -> Maybe UserType
+          mkUserType "superadmin" = Just SuperAdmin
+          mkUserType "admin" = Just Admin
+          mkUserType "registered" = Just Registered
+          mkUserType _ = Nothing
+
+This will compile just fine, but will error out at runtime with the following
+error. ::
+
+  *** Exception: Incompatible {errSQLType = "user_type",
+      errSQLTableOid = Just (Oid 33093), errSQLField = "result4_2", errHaskellType = "Text", 
+      errMessage = "types incompatible"}
+
+This error is produced by the *fromField* instance of a string.
+If you look at the error, you will see two fields *errSQLType* and *errHaskellType*. This means that
+you are trying to read from a postgres column type of "user_type" (our custom enum type that we have created in postgresql), 
+into a Haskell value of type *Text*. So it turns out that the FromField instance of String will only
+read from columns of types such as `Varchar, Char etc. <https://mail.haskell.org/pipermail/database-devel/2012-June/000019.html>`_

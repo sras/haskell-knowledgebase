@@ -1,5 +1,8 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE Arrows                #-}
+{-# LANGUAGE OverloadedStrings      #-}
+
 module Main where
 
 import Opaleye
@@ -9,14 +12,16 @@ import Data.Profunctor.Product.Default
 import Database.PostgreSQL.Simple
 import Database.PostgreSQL.Simple.FromField (FromField(..))
 
+import Control.Arrow
+
 userTable :: Table 
-  (Column PGInt4, Column PGText, Column PGText) 
-  (Column PGInt4, Column PGText, Column PGText)
+    (Column PGInt4, Column PGText, Column PGText) 
+    (Column PGInt4, Column PGText, Column PGText)
 userTable = Table "users" (p3 (
-  required "id",
-  required "name",
-  required "email"
-  ))
+    required "id",
+    required "name",
+    required "email"
+    ))
 
 newtype UserId = UserId Int deriving (Show)
 
@@ -37,7 +42,11 @@ instance Default QueryRunner (Column PGInt4, Column PGText, Column PGText) User 
 getUserRows :: IO [User]
 getUserRows = do
   conn <- connect defaultConnectInfo { connectDatabase = "scratch"}
-  runQuery conn $ queryTable userTable
+  runQuery conn $ proc () ->
+    do
+      user@(_, pgName, _) <- queryTable userTable -< ()
+      restrict -< (pgName .== (pgStrictText "John"))
+      returnA -< user
 
 main :: IO ()
 main = do
@@ -46,6 +55,4 @@ main = do
 
 -- Output
 -- >main
--- [User {id = UserId 1, name = "John", email = "john@mail.com"},
---  User {id = UserId 2, name = "Bob", email = "bob@mail.com"},
---  User {id = UserId 3, name = "Alice", email = "alice@mail.com"}]
+-- [User {id = UserId 1, name = "John", email = "john@mail.com"}]

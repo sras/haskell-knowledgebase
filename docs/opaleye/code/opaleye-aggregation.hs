@@ -40,13 +40,13 @@ instance FromField UserId where
 instance QueryRunnerColumnDefault PGInt4 UserId where
   queryRunnerColumnDefault = fieldQueryRunnerColumn
 
-getUserRows :: IO [UserPoly Int64 Int64 String]
+getUserRows :: IO [UserPoly [Int] String String]
 getUserRows = do
   conn <- connect defaultConnectInfo { connectDatabase = "scratch"}
   runQuery conn $ gQuery
   where
-    gQuery :: Opaleye.Query (UserPoly (Column PGInt8) (Column PGInt8) (Column PGText))
-    gQuery = aggregate (pUser User { id = count, name = count, email = groupBy }) query
+    gQuery :: Opaleye.Query (UserPoly (Column (PGArray PGInt4)) (Column PGText) (Column PGText))
+    gQuery = aggregate (pUser User { id = arrayAgg, name = stringAgg (pgStrictText ""), email = groupBy }) query
     query :: Opaleye.Query UserPGR
     query = queryTable userTable
 

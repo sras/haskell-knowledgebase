@@ -6,4 +6,5 @@ Knowledgebase
 
      docs/opaleye/index
      docs/tsung/index
+     docs/digestive-functors-aeson/index
 

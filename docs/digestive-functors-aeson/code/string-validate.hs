@@ -31,7 +31,7 @@ import Data.Aeson hiding ((.:))
 --  If you have a form that can read an Integer, you can make a form that will
 --  read an integer from the "age" filed using 
 --     "age" .: formInt
---  Once you have a form that read value of type a, you can add validation check
+--  Once you have a form that reads the value of type a, you can add validation check
 --  to the form using the "check" function. This function accepts a Form of type `a`
 --  and function `a -> Bool` and a validation message and returns another Form of
 --  the same type, but with validation added.

@@ -1,7 +1,5 @@
-Digestive Functors Aeson
-========================
-
-See the code below
+Usage samples with comments
+===========================
 
 .. literalinclude:: code/string-validate.hs
    :linenos:

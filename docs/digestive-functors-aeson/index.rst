@@ -1,5 +1,5 @@
-Opaleye 
-==============================
+Digestive functors aeson
+========================
 
   .. toctree::
      :maxdepth: 2

@@ -6,13 +6,29 @@ import Data.Text
 import Text.Digestive
 import Text.Digestive.Aeson
 import Data.Scientific
-import Data.Aeson hiding ((.:))
+import Data.Maybe
+import Data.Aeson hiding ((.:), Result, Error, Success)
+import Prelude hiding (Result)
+
+-- In apis that communicate using JSON, we often have to validate
+-- an incoming json payload, before we pass it into our application.
+-- Tradition json parsing falls short in a couple of ways
+
+-- 1. It cannot collect more than one error
+-- 2. It cannot add validation to the successfully parsed JSON
+
+-- Digestive functors aeson, is a lib that try to solve this problem.
 
 -- A json 'Value' can be validated using the `digestJSON` function.
 -- 
---     digestJSON :: Monad m	 => Form v m a	-> Value	-> m (View v, Maybe a)	 
+--     digestJSON :: Monad m => Form v m a	-> Value	-> m (View v, Maybe a)	 
 -- 
--- The first argument is most important data type here, which is
+-- The inputs to this function is a value of type 'Form v m a' and the actual
+-- JSON 'Value' type (exported by Data.Aeson)
+-- 
+-- This library provides functions to create those, the simplest of which are
+--     text, string and stringRead functions.
+
 -- 
 --     type Form v m a = FormTree m v m a 
 -- 
@@ -46,9 +62,13 @@ import Data.Aeson hiding ((.:))
 
 -- here are a couple of functions that will create values of type Value.
 stringValue :: Value
-stringValue = stringValue'
-  where
-  Just stringValue' = decode "\"A string\""
+stringValue = String (pack "A String")
+
+intWrappedInString :: Value
+intWrappedInString = fromJust $ decode "\"25\""
+
+intValue :: Value
+intValue = fromJust $ decode "25"
 
 -- here is a Value that represents a string in an object
 wrappedStringValue :: Value
@@ -83,19 +103,35 @@ stringFormValidationFromKeyToUserDefined = UserName <$> "InputString" .: stringF
 -- Here is a form that read an integer that is embedded as a String in the json.
 -- For ex: {"age" : "25"}
 numberFromStringForm :: Form Text IO Int
-numberFromStringForm = "age" .: stringRead "Failed to parse as a number" Nothing
+numberFromStringForm = stringRead "Failed to parse as a number" Nothing
 --
 -- Please note in the above that the number 25 is wrapped in quotes.
 -- If you want to read from unwrapped numeric values.
 -- For ex: {"age" : 25}, You have to first create
 -- a form that can read a Scientific value, and then use the functor instance to
 -- make forms for other number types from it. Here is how you would read an unwrapped integer
-
 numberFromNumberForm :: Form Text IO Int
-numberFromNumberForm = floor <$> scientificForm
+numberFromNumberForm = validate checkAndConvertToInt scientificForm
   where
+    checkAndConvertToInt :: Scientific -> Result Text Int
+    checkAndConvertToInt s = if isInteger s then Success (floor s) else Error "Number is not an intger"
     scientificForm :: Form Text IO Scientific
-    scientificForm = "age" .: stringRead "Failed to parse as a number" Nothing
+    scientificForm = stringRead "Failed to parse as a number" Nothing
+
+-- Here is how you can collect validation failures from multiple validations on the 
+-- same form.
+
+-- Below is a form for reading a String that do two validation
+-- That collect all the validation errors
+stringFormWithTwoValidation :: Form [Text] IO String
+stringFormWithTwoValidation = 
+      validate (conditions [testLength, testNoSpace]) $
+      string Nothing
+    where
+      testLength :: String -> Result Text String
+      testLength s = if Prelude.length s < 10 then Error (pack "String should be longer than 10 chars") else Success s
+      testNoSpace :: String -> Result Text String
+      testNoSpace s = if elem ' ' s then Error (pack "String should not contain a space") else Success s
 
 testStringForm :: IO ()
 testStringForm = do

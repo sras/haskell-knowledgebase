@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings      #-}
 {-# LANGUAGE TemplateHaskell        #-}
+{-# LANGUAGE Arrows        #-}
 
 module Main where
 
@@ -15,6 +16,7 @@ import Database.PostgreSQL.Simple
 import Database.PostgreSQL.Simple.FromField (FromField(..))
 
 import Prelude hiding (id)
+import Control.Arrow
 
 newtype UserId = UserId Int deriving (Show)
 
@@ -23,6 +25,7 @@ data UserPoly id name email = User { id :: id, name :: name, email :: email } de
 type User = UserPoly UserId String String
 type UserPGW = UserPoly (Column PGInt4) (Column PGText) (Column PGText)
 type UserPGR = UserPoly (Column PGInt4) (Column PGText) (Column PGText)
+type UserPGR1 = UserPoly (Column PGInt4) (Column (Nullable PGText)) (Column PGText)
 
 $(makeAdaptorAndInstance "pUser" ''UserPoly)
 
@@ -40,13 +43,17 @@ instance FromField UserId where
 instance QueryRunnerColumnDefault PGInt4 UserId where
   queryRunnerColumnDefault = fieldQueryRunnerColumn
 
-getUserRows :: IO [UserPoly Int String String]
+getUserRows :: IO [UserPoly Int (Maybe String) String]
 getUserRows = do
   conn <- connect defaultConnectInfo { connectDatabase = "scratch"}
-  runQuery conn $ query
+  runQuery conn $ query2
   where
     query :: Opaleye.Query UserPGR
     query = queryTable userTable
+    query2 :: Opaleye.Query UserPGR1
+    query2 = proc () -> do
+      User id name email <- query -< ()
+      returnA -<  User id Opaleye.null email
 
 main :: IO ()
 main = do
